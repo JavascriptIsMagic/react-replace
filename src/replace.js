@@ -67,7 +67,7 @@ function replace(transformation) {
 	return replaceTransformation;
 }
 
-/** replaceElementsByPredicate(predicate)(transformation)(originalElements) => Elements 
+/** replaceElementsByPredicate(predicate)(transformation)(originalElements) -> Elements 
 		Recusively searches originalElements tree 
 		Filters by a predicate 
 		Maps them over a transformation 
@@ -116,6 +116,9 @@ function predicateFromClassNameRegex(regex, options) {
 	});
 }
 
+/**
+	replaceElementsByClassNames(Object { [className]: transformation(Element) -> Element })(Element) -> Element
+*/
 function replaceElementsByClassNames(classNamesToTransformations) {
 	var transformations = Object.keys(classNamesToTransformations).
 		map(function (key) {
