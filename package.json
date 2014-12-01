@@ -1,0 +1,31 @@
+{
+  "name": "react-replace",
+  "version": "0.0.0",
+  "description": "React utilities for manipulating the tree structure of React Elements in a functional way.",
+  "main": "src/replace.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/javascriptismagic/react-replace.git"
+  },
+  "keywords": [
+    "react",
+    "functional",
+    "replace",
+    "predicate",
+    "cloneWithProps",
+		"query",
+    "reactjs",
+    "react.js",
+    "react-replace"
+  ],
+  "author": "Brian <javascriptismagic@gmail.com>",
+  "license": "Public Domain (Unlicense)",
+  "bugs": {
+    "url": "https://github.com/javascriptismagic/react-replace/issues"
+  },
+  "homepage": "https://github.com/javascriptismagic/react-replace",
+  "dependencies": {
+    "merge": "1.x.x",
+    "react": "0.x.x"
+  }
+}
