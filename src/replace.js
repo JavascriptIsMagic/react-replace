@@ -16,18 +16,16 @@ module.exports = {
 			or a PropertiesObject
 	@returns PropertiesObject
 */
-function propertiesTransform(transformOrElementOrPropertiesObject) {
-	var transform = ((transformOrElementOrPropertiesObject instanceof Function) ?
-		transformOrElementOrPropertiesObject :
-		(function (originalElement) {
-			var properties =
-				merge({},
-					(transformOrElementOrPropertiesObject && transformOrElementOrPropertiesObject._isReactElement) ?
-						transformOrElementOrPropertiesObject.props :
-						transformOrElementOrPropertiesObject);
-			return properties;
-		}));
-	return transform;
+function propertiesTransform(transformElementToProperties) {
+	var transform = (transformElementToProperties instanceof Function ?
+		transformElementToProperties :
+		function () { return transformElementToProperties; });
+	return function (ElementOrProperties) {
+		return (merge({},
+			transform(ElementOrProperties && ElementOrProperties._isReactElement ?
+				ElementOrProperties.props :
+				ElementOrProperties)));
+	}
 }
 
 /** replace(transformation)(originalElement) -> Element
