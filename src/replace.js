@@ -1,137 +1,108 @@
+'use strict';
 const React = require('react/addons'),
 	cloneWithProps = React.addons.cloneWithProps,
 	merge = require('merge');
 
-module.exports = {
-	replace: replace,
-	replaceElementsByPredicate: replaceElementsByPredicate,
-	replaceElementsByClassNames: replaceElementsByClassNames,
-};
+module.exports = merge(replace, {
+	by: merge(replaceBy, {
+		any: {
+			className: replaceByAnyClassName,
+		}
+	}),
+	has: {
+		any: {
+			className: hasAnyClassName,
+		}
+	},
+});
 
-/** propertiesTransform(Transform | Element | PropertiesObject)(originalElement) -> PropertiesObject
-	@argument ElementOrPropertiesObject
-		Can be:
-			function Transform(originalElement) -> Element or PropertiesObject
-			or an Element (Element.props is used)
-			or a PropertiesObject
-	@returns PropertiesObject
+/** @function replace(transform)(Elements) -> Elements
+	@function transform(Element) -> Element
+	Applies the transform function if predicate(Element) returns true
+	over all nodes in the Elements tree.
 */
-function propertiesTransform(transformElementToProperties) {
-	var transform = (transformElementToProperties instanceof Function ?
-		transformElementToProperties :
-		function () { return transformElementToProperties; });
-	return function (ElementOrProperties) {
-		return (merge({},
-			transform(ElementOrProperties && ElementOrProperties._isReactElement ?
-				ElementOrProperties.props :
-				ElementOrProperties)));
+function replace(transform) {
+	if (typeof transform !== 'function') {
+		/** @todo: transform could be a set of new props? */
+		throw new Error('replace(transform)(Element) transform must be a function.');
+	}
+	if (transform && transform._isReactElement) {
+		transform = transform.props;
+	}
+	if (transform && typeof transform === 'object') {
+		transform = function (props) {
+			return function () {
+				return props;
+			};
+		}(transform);
+	}
+	return function (Element) {
+		var props = properties(transform(Element));
+		if (props && props._isReactElement) {
+			props = props.props;
+		}
+		return cloneWithProps(Element, merge({ key: Element.key, ref: Element.ref, }, props));
 	}
 }
 
-/** replace(transformation)(originalElement) -> Element
-	Calls React.addons.cloneWithProps and preserves Element.key and Element.ref,
-	Use this if your intention is to replace the original Element instead of copying the original Element.
-	This does not modify the original Element but will have the same key.
-	@argument transformation see: propertiesTransform
-	@arguments originalElements
-	@examples
-	```
-		var replace = require('react-replace').replace;
-		
-		replace({ modified: true })(<div key="original"/>);
-		replace(<div modified/>)(<div key="original"/>);
-		replace(function (originalElement) { return { modified: true }; })(<div key="original"/>);
-		replace(function (originalElement) { return <div modified/>; })(<div key="original"/>);
-		
-		// All return <div key="original" modified />
-	```
+/** @function replace.by(predicate)(transform)(Elements) -> Elements
+	@function predicate(Element) -> Boolean like what you pass Array.prototype.filter
+	@function transform(Element) -> Element like what you pass Array.prototype.map
+	Applies the transform function if predicate(Element) returns true
+	over all nodes in the Elements tree.
 */
-function replace(transformation) {
-	transformation = propertiesTransform(transformation);
-	function replaceTransformation(originalElements) {
-		if (Array.isArray(originalElements)) {
-			// originalElements is an array of Elements:
-			return originalElements.map(replaceTransformation);
-		}
-		// originalElements is an Element:
-		if (originalElements && originalElements._isReactElement) {
-			return (cloneWithProps(originalElement, 
-				merge({ key: originalElement.key, ref: originalElement.ref },
-					properties(props))));
-		}
-		// originalElements is not an Element:
-		return originalElements;
+function replaceBy(predicate) {
+	if (typeof predicate !== 'function') {
+		/** @todo: predicate could be a string query much like jquery css selectors? */
+		throw new Error('replaceBy(predicate)(transform)(Elements) predicate must be a function.');
 	}
-	return replaceTransformation;
-}
-
-/** replaceElementsByPredicate(predicate)(transformation)(originalElements) -> Elements 
-		Recusively searches originalElements tree 
-		Filters by a predicate 
-		Maps them over a transformation 
-		Returns the new Elements tree without modifying the originalElements
-	@argument @function predicate(Element) -> Boolean
-		like what you would pass to Array.prototype.filter
-	@argument @function transformation - like what you pass to Array.prototype.map
-	@argument originalElements: Element
-	@returns Elements
-*/
-function replaceElementsByPredicate(predicate) {
-	return function (transformation) {
-		transformation = replace(transformation);
-		function byPredicate(originalElements) {
-			if (Array.isArray(originalElements)) {
-				return originalElements.map(byPredicate);
+	function map(transform) {
+		var replaceTransform = replace(transform);
+		function query(Elements) {
+			if (Array.isArray(Elements)) {
+				return Elements.map(query);
 			}
-			if (originalElements && originalElements._isReactElement && predicate(originalElements)) {
-				return transformation(originalElements);
+			if (Elements && Elements._isReactElement && predicate(Elements)) {
+				var Element = replaceTransform(Elements);
+				if (Element.props.children) {
+					Element.props.children = query(Element.props.children);
+				}
+				return Element;
 			}
-			return originalElements;
+			return Elements;
 		};
-		return byPredicate;
+		return query;
+	};
+	return map;
+}
+
+/** @function replace.has.any.className(name)(Element) -> Boolean
+	Accepts a string of class names separated by spaces,
+		and returns a predicate that returns true
+		if any of those class names match Element.className
+*/
+function hasAnyClassName(names) {
+	var regex = new RegExp('\b' + names.replace(/^\W|\W$/g, '').replace(/\W+/g, '\b|\b') + '\b', 'i');
+	return function (Element) {
+		return (Element && regex.test(Element.className));
 	}
 }
 
-function classNamesToRegex(classNameString) {
-	return new RegExp(classNameString.replace(/\W+/g, '|').replace(/^\|+|\|+$/g, ''), 'gi');
-}
-
-function predicateFromRegex(regex, options) {
-	if (typeof regex === 'string')
-		regex = new RegExp(regex, options);
-	return (function (string) {
-		return regex.test(string);
-	});
-}
-
-function predicateFromClassNameRegex(regex, options) {
-	var predicate = predicateFromRegex(regex, options);
-	return (function (Element) {
-		return (
-			Element &&
-			Element.props &&
-			predicate(Element.props.className));
-	});
-}
-
-/**
-	replaceElementsByClassNames(Object { [className]: transformation(Element) -> Element })(Element) -> Element
+/** @function replace.by.any.className({ [names]: transform(Element) -> Element })(Elements) -> Elements
+	Applies the transforms to all nodes in the Elements tree
+		if any of those class names match Element.className
 */
-function replaceElementsByClassNames(classNamesToTransformations) {
-	var transformations = Object.keys(classNamesToTransformations).
-		map(function (key) {
-			return (replaceElementsByPredicate(
-				predicateFromClassNameRegex(
-					classNamesToRegex(key)
-				)
-			)(
-				propertiesTransform(classNamesToTransformations[key])
-			));
-		}).
-		reduce(function (next, transformation) {
-			return transformation(next);
-		}, function (Element) {
-			return Element;
-		});
-	return transforms;
+replaceByAnyClassName(namesToTransforms) {
+	var transforms = Object.key(namesToTransforms).
+		reduce(function (transforms, names) {
+			var predicate = hasAnyClassName(names),
+				transform = namesToTransforms[names];
+			return function (Element) {
+				if (Element && Element._isReactElement && predicate(Element)) {
+					return transforms(transform(Element));
+				}
+				return Element;
+			};
+		}, function (Element) { return Element; });
+	return replaceBy(function (Element) { return true; })(transforms);
 }
