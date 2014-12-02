@@ -34,7 +34,10 @@ function replace(transform) {
 		if (props && props._isReactElement) {
 			props = props.props;
 		}
-		return cloneWithProps(Element, merge({ key: Element.key, ref: Element.ref, }, props));
+		var propsWithKeyAndRef = {};
+		if (Element.key) { propsWithKeyAndRef.key = Element.key; }
+		if (Element.ref) { propsWithKeyAndRef.ref = Element.ref; }
+		return cloneWithProps(Element, merge(propsWithKeyAndRef, props));
 	}
 }
 
@@ -70,7 +73,7 @@ function replaceBy(predicate) {
 	return map;
 }
 
-/** @function replace.has.any.className(name)(Element) -> Boolean
+/** @function replace.has.className(name)(Element) -> Boolean
 	Accepts a string of class names separated by spaces,
 		and returns a predicate that returns true
 		if any of those class names match Element.className
@@ -82,7 +85,7 @@ function hasClassName(names) {
 	}
 }
 
-/** @function replace.by.any.className({ [names]: transform(Element) -> Element })(Elements) -> Elements
+/** @function replace.by.className({ [names]: transform(Element) -> Element })(Elements) -> Elements
 	Applies the transforms to all nodes in the Elements tree
 		if any of those class names match Element.className
 */
