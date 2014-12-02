@@ -1,6 +1,6 @@
 {
   "name": "react-replace",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "React utilities for manipulating the tree structure of React Elements in a functional way.",
   "main": "src/replace.js",
   "repository": {
