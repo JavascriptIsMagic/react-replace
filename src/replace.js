@@ -4,18 +4,11 @@ var
 	cloneWithProps = React.addons.cloneWithProps,
 	merge = require('merge');
 
-module.exports = merge(replace, {
-	by: merge(replaceBy, {
-		any: {
-			className: replaceByAnyClassName,
-		}
-	}),
-	has: {
-		any: {
-			className: hasAnyClassName,
-		}
-	},
-});
+module.exports = replace;
+replace.by = replaceBy;
+replace.by.classNames = replaceByClassNames;
+replace.has = {};
+replace.has.className = hasClassName;
 
 /** @function replace(transform)(Elements) -> Elements
 	@function transform(Element) -> Element
@@ -23,22 +16,21 @@ module.exports = merge(replace, {
 	over all nodes in the Elements tree.
 */
 function replace(transform) {
-	if (typeof transform !== 'function') {
-		/** @todo: transform could be a set of new props? */
-		throw new Error('replace(transform)(Element) transform must be a function.');
-	}
 	if (transform && transform._isReactElement) {
 		transform = transform.props;
 	}
-	if (transform && typeof transform === 'object') {
-		transform = function (props) {
+	if (typeof transform !== 'function') {
+		transform = (function (props) {
 			return function () {
 				return props;
 			};
-		}(transform);
+		}(transform));
 	}
 	return function (Element) {
-		var props = properties(transform(Element));
+		var props = transform(Element);
+		if (props === Element) {
+			return Element;
+		}
 		if (props && props._isReactElement) {
 			props = props.props;
 		}
@@ -63,12 +55,13 @@ function replaceBy(predicate) {
 			if (Array.isArray(Elements)) {
 				return Elements.map(query);
 			}
-			if (Elements && Elements._isReactElement && predicate(Elements)) {
-				var Element = replaceTransform(Elements);
-				if (Element.props.children) {
-					Element.props.children = query(Element.props.children);
+			if (Elements && Elements._isReactElement) {
+				if (predicate(Elements)) {
+					Elements = replaceTransform(Elements);
 				}
-				return Element;
+				if (Elements.props.children) {
+					return replace({ children: query(Elements.props.children) })(Elements);
+				}
 			}
 			return Elements;
 		};
@@ -82,10 +75,10 @@ function replaceBy(predicate) {
 		and returns a predicate that returns true
 		if any of those class names match Element.className
 */
-function hasAnyClassName(names) {
-	var regex = new RegExp('\b' + names.replace(/^\W|\W$/g, '').replace(/\W+/g, '\b|\b') + '\b', 'i');
+function hasClassName(names) {
+	var regex = new RegExp('\\b(' + names.replace(/^\W+|\W+$/g, '').replace(/\W+/g, '|') + ')\\b', 'i');
 	return function (Element) {
-		return (Element && regex.test(Element.className));
+		return (Element && regex.test(Element.props.className));
 	}
 }
 
@@ -93,17 +86,29 @@ function hasAnyClassName(names) {
 	Applies the transforms to all nodes in the Elements tree
 		if any of those class names match Element.className
 */
-function replaceByAnyClassName(namesToTransforms) {
-	var transforms = Object.keys(namesToTransforms).
-		reduce(function (transforms, names) {
-			var predicate = hasAnyClassName(names),
-				transform = namesToTransforms[names];
+function replaceByClassNames(namesToTransforms) {
+	var maybeTransforms = Object.keys(namesToTransforms).
+		reduce(function (next, names) {
+			var predicate = hasClassName(names),
+				transform = replace(namesToTransforms[names]);
 			return function (Element) {
-				if (Element && Element._isReactElement && predicate(Element)) {
-					return transforms(transform(Element));
+				if (predicate(Element)) {
+					Element = transform(Element);
 				}
-				return Element;
-			};
+				return next(Element);
+			}
 		}, function (Element) { return Element; });
-	return replaceBy(function (Element) { return true; })(transforms);
+	function query(Element) {
+		if (Array.isArray(Element)) {
+			return Element.map(query);
+		}
+		if (Element && Element._isReactElement) {
+			Element = maybeTransforms(Element);
+			if (Element.props.children) {
+				Element = replace({ children: query(Element.props.children) })(Element);
+			}
+		}
+		return Element;
+	}
+	return query;
 }
