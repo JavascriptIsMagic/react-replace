@@ -1,5 +1,6 @@
 'use strict';
-const React = require('react/addons'),
+var
+	React = require('react/addons'),
 	cloneWithProps = React.addons.cloneWithProps,
 	merge = require('merge');
 
@@ -92,8 +93,8 @@ function hasAnyClassName(names) {
 	Applies the transforms to all nodes in the Elements tree
 		if any of those class names match Element.className
 */
-replaceByAnyClassName(namesToTransforms) {
-	var transforms = Object.key(namesToTransforms).
+function replaceByAnyClassName(namesToTransforms) {
+	var transforms = Object.keys(namesToTransforms).
 		reduce(function (transforms, names) {
 			var predicate = hasAnyClassName(names),
 				transform = namesToTransforms[names];
